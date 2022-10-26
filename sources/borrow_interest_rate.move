@@ -213,4 +213,9 @@ module lend_config::borrow_interest_rate{
         math::mul_div_u128(borrow, 1000, supply)
     }
 
+    /// Return index, the result is extended 100 times
+    public fun calc_index<C>(old_index: u64, interest_rate: u64): u64 {
+        old_index * (100 + interest_rate) / 100
+    }
+
 }

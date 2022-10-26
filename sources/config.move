@@ -81,20 +81,20 @@ module lend_config::config {
     }
 
     public entry fun add<C>(account: &signer, ltv: u8, fees: u8, weight: u8, deposit_limit: u64) acquires Config {
+        assert!(ltv < 100, error::invalid_argument(ELTV_MORE_THAN_100));
+        assert!(fees < 100, error::invalid_argument(EFEES_MORE_THAN_100));
+
         let account_addr = signer::address_of(account);
         assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
         assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
 
-        assert!(ltv < 100, error::invalid_argument(ELTV_MORE_THAN_100));
-        assert!(fees < 100, error::invalid_argument(EFEES_MORE_THAN_100));
-
-        let config = borrow_global_mut<Config>(account_addr);
+        let config = borrow_global_mut<Config>(@lend_config);
 
         let type_info = type_of<C>();
 
         let (e, _i) = contains(&config.stores, &type_info);
         if (e) {
-          abort EALREADY_ADDED
+            abort EALREADY_ADDED
         };
 
         vector::push_back(&mut config.stores, Store { ct: type_info, ltv, fees, weight, deposit_limit });
@@ -117,70 +117,56 @@ module lend_config::config {
         };
     }
 
-    public entry fun set_weight<C>(account: &signer, new_w: u8) acquires Config {
+    fun borrow_mut(account: &signer, ct: &TypeInfo): Store acquires Config {
         let account_addr = signer::address_of(account);
         assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
         assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
 
-        let config = borrow_global_mut<Config>(account_addr);
-        let type_info = type_of<C>();
+        let config = borrow_global_mut<Config>(@lend_config);
 
-
-        let (e, i) = contains(&config.stores, &type_info);
+        let (e, i) = contains(&config.stores, ct);
         if (e) {
-            let store = vector::borrow_mut(&mut config.stores, i);
-            store.weight = new_w;
+            *vector::borrow_mut(&mut config.stores, i)
         } else {
             abort ENOT_FOUND_COIN_TYPE
-        };
+        }
+    }
+
+    public entry fun set_weight<C>(account: &signer, new_w: u8) acquires Config {
+        let type_info = type_of<C>();
+
+        let store = borrow_mut(account, &type_info);
+
+        store.weight = new_w
     }
 
     public entry fun set_ltv<C>(account: &signer, new_ltv: u8) acquires Config {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
-
         assert!(new_ltv < 100, error::invalid_argument(ELTV_MORE_THAN_100));
-
-        let config = borrow_global_mut<Config>(account_addr);
 
         let type_info = type_of<C>();
 
-        let (e, i) = contains(&config.stores, &type_info);
-        if (e) {
-            let store = vector::borrow_mut(&mut config.stores, i);
-            store.ltv = new_ltv;
-        } else {
-            abort ENOT_FOUND_COIN_TYPE
-        };
+        let store = borrow_mut(account, &type_info);
+
+        store.ltv = new_ltv
     }
 
     public entry fun set_fees<C>(account: &signer, new_fees: u8) acquires Config {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
-
         assert!(new_fees < 100, error::invalid_argument(EFEES_MORE_THAN_100));
-
-        let config = borrow_global_mut<Config>(account_addr);
 
         let type_info = type_of<C>();
 
-        let (e, i) = contains(&config.stores, &type_info);
-        if (e) {
-            let store = vector::borrow_mut(&mut config.stores, i);
-            store.fees = new_fees;
-        } else {
-            abort ENOT_FOUND_COIN_TYPE
-        };
+        let store = borrow_mut(account, &type_info);
+
+        store.fees = new_fees
     }
+
+
 
     public entry fun set_apn_reward_stake<C>(account: &signer, new_reward: u64) acquires Config {
         let account_addr = signer::address_of(account);
         assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
         assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
-
-        let config = borrow_global_mut<Config>(account_addr);
+        let config = borrow_global_mut<Config>(@lend_config);
 
         config.total_apn_rewards_stake = new_reward
     }
@@ -189,8 +175,8 @@ module lend_config::config {
         let account_addr = signer::address_of(account);
         assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
         assert!(exists<Config>(account_addr), error::not_found(ENOT_FOUND_CONFIG));
+        let config = borrow_global_mut<Config>(@lend_config);
 
-        let config = borrow_global_mut<Config>(account_addr);
 
         config.total_apn_rewards = new_reward
     }
@@ -215,7 +201,7 @@ module lend_config::config {
         };
     }
 
-    /// Return APN reward for each coin, the result is extended 100 times
+    /// Return APN reward for each coin
     public fun apn_reward<C>(): u64 acquires Config {
         assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
 
@@ -237,25 +223,12 @@ module lend_config::config {
 
     /// Return APN reward per seconds for each coin, the result is extended 100 times
     public fun apn_reward_per_secs<C>(): u64 acquires Config {
-        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
+        let r = apn_reward<C>();
 
-        let config = borrow_global<Config>(@lend_config);
-
-        let type_info = type_of<C>();
-
-        let (e, i) = contains(&config.stores, &type_info);
-
-        if (e) {
-            let sum = sum(&config.stores);
-            let store = vector::borrow(&config.stores, i);
-            let r = (100 * config.total_apn_rewards * (store.weight as u64) as u128) / (sum * APN_DURATION * 2 as u128);
-            (r as u64)
-        } else {
-            abort ENOT_EXISTS_APN_REWARD
-        }
+        100 * r / APN_DURATION
     }
 
-    /// Return APN reward for stake, the result is extended 100 times
+    /// Return APN reward for stake
     public fun apn_reward_stake<C>(): u64 acquires Config {
         assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
 
@@ -266,78 +239,51 @@ module lend_config::config {
 
     /// Return APN reward per seconds for stake, the result is extended 100 times
     public fun apn_reward_stake_per_secs<C>(): u64 acquires Config {
-        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
+        let r = apn_reward_stake<C>();
 
-        let config = borrow_global<Config>(@lend_config);
-
-        100 * config.total_apn_rewards_stake / APN_DURATION
+        100 * r / APN_DURATION
     }
 
-    /// Return service fees, the result is extended 100 times
-    public fun fees<C>(): u8 acquires Config {
+    fun borrow(ct: &TypeInfo): Store acquires Config {
         assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
-
         let config = borrow_global<Config>(@lend_config);
 
-        let type_info = type_of<C>();
-
-        let (e, i) = contains(&config.stores, &type_info);
+        let (e, i) = contains(&config.stores, ct);
 
         if (e) {
-            let store = vector::borrow(&config.stores, i);
-            store.fees
+            *vector::borrow(&config.stores, i)
         } else {
             abort ENOT_EXISTS_FEES
         }
     }
 
+    /// Return service fees, the result is extended 100 times
+    public fun fees<C>(): u8 acquires Config {
+        let type_info = type_of<C>();
+        let store = borrow(&type_info);
+        store.fees
+    }
+
     /// Return LTV, the result is extended 100 times
     public fun ltv<C>(): u8 acquires Config {
-        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
-
-        let config = borrow_global<Config>(@lend_config);
         let type_info = type_of<C>();
-        let (e, i) = contains(&config.stores, &type_info);
 
-        if (e) {
-            let store = vector::borrow(&config.stores, i);
-            store.ltv
-        } else {
-            abort ENOT_EXISTS_LTV
-        }
+        ltv_with_coin_type(&type_info)
     }
 
     /// Return LTV, the result is extended 100 times
     public fun ltv_with_coin_type(ct: &TypeInfo): u8 acquires Config {
-        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
-
-        let config = borrow_global<Config>(@lend_config);
-        let (e, i) = contains(&config.stores, ct);
-
-        if (e) {
-            let store = vector::borrow(&config.stores, i);
-            store.ltv
-        } else {
-            abort ENOT_EXISTS_LTV
-        }
+        let store = borrow(ct);
+        store.ltv
     }
 
     /// Return how many is the limit amount when deposit
     public fun deposit_limit<C>(): u64 acquires Config {
-        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
-
-        let config = borrow_global<Config>(@lend_config);
-
         let type_info = type_of<C>();
 
-        let (e, i) = contains(&config.stores, &type_info);
+        let store = borrow(&type_info);
 
-        if (e) {
-            let store = vector::borrow(&config.stores, i);
-            store.deposit_limit
-        } else {
-            abort ENOT_EXISTS_DEPOSIT_LIMIT
-        }
+        store.deposit_limit
     }
 
 }
