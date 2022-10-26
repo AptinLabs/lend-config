@@ -307,6 +307,21 @@ module lend_config::config {
         }
     }
 
+    /// Return LTV, the result is extended 100 times
+    public fun ltv_with_coin_type(ct: &TypeInfo): u8 acquires Config {
+        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
+
+        let config = borrow_global<Config>(@lend_config);
+        let (e, i) = contains(&config.stores, ct);
+
+        if (e) {
+            let store = vector::borrow(&config.stores, i);
+            store.ltv
+        } else {
+            abort ENOT_EXISTS_LTV
+        }
+    }
+
     /// Return how many is the limit amount when deposit
     public fun deposit_limit<C>(): u64 acquires Config {
         assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
