@@ -204,8 +204,18 @@ module lend_config::borrow_interest_rate{
     }
 
     // result extend 100 times
+    public fun calc_borrow_interest_rate_with_diff_time<C>(u: u64, diff_time: u64): u64 acquires Params {
+        calc_borrow_interest_rate<C>(u) * diff_time
+    }
+
+    // result extend 100 times  todo: remove generic
     public fun calc_supply_interest_rate<C>(borrow_interest_rate: u64, u: u64): u64 {
         math::mul_div(borrow_interest_rate, u, 1000)
+    }
+
+    // result extend 100 times
+    public fun calc_supply_interest_rate_with_diff_time(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
+        math::mul_div(borrow_interest_rate * diff_time, u, 1000)
     }
 
     // result extend 1000 times
