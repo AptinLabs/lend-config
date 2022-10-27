@@ -220,6 +220,9 @@ module lend_config::borrow_interest_rate{
 
     // result extend 1000 times
     public fun calc_utilization<C>(borrow: u128, supply: u128): u64 {
+        if (supply == 0) {
+            supply = 1
+        };
         math::mul_div_u128(borrow, 1000, supply)
     }
 
