@@ -218,4 +218,9 @@ module lend_config::borrow_interest_rate{
         old_index * (100 + interest_rate) / 100
     }
 
+    /// Return index, the result is extended 100 times
+    public fun calc_index2(old_index: u64, interest_rate: u64): u64 {
+        old_index * (100 + interest_rate) / 100
+    }
+
 }
