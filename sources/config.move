@@ -50,6 +50,7 @@ module lend_config::config {
         while (i < len) {
             let store = vector::borrow(stores, i);
             sum = sum + (store.weight as u64);
+            i = i + 1;
         };
 
         sum
@@ -65,7 +66,7 @@ module lend_config::config {
             };
             i = i + 1;
         };
-        (false, i)
+        (false, 0)
     }
 
     public entry fun initialize(account: &signer) {
