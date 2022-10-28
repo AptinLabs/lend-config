@@ -210,6 +210,10 @@ module lend_config::borrow_interest_rate{
         calc_borrow_interest_rate<C>(u) * diff_time
     }
 
+    public fun calc_borrow_interest_rate_with_diff_time_u128<C>(u: u64, diff_time: u64): u128 acquires Params {
+        (calc_borrow_interest_rate<C>(u) as u128) * (diff_time as u128)
+    }
+
     // result extend 100000 times, should div 100000  todo: remove generic
     public fun calc_supply_interest_rate<C>(borrow_interest_rate: u64, u: u64): u64 {
         math::mul_div(borrow_interest_rate, u, 10)
@@ -218,6 +222,10 @@ module lend_config::borrow_interest_rate{
     // result extend 100000 times, should div 100000
     public fun calc_supply_interest_rate_with_diff_time(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
         math::mul_div(borrow_interest_rate * diff_time, u, 10)
+    }
+
+    public fun calc_supply_interest_rate_with_diff_time_u128(borrow_interest_rate: u64, u: u64, diff_time: u64): u128 {
+        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (10 as u128)
     }
 
     // result extend 10000 times
@@ -231,6 +239,10 @@ module lend_config::borrow_interest_rate{
     /// Return index, the result is extended 10000 times
     public fun calc_index<C>(old_index: u64, interest_rate: u64): u64 {
         (old_index * (100000 + interest_rate) + 5000) / 100000
+    }
+
+    public fun calc_index_u128<C>(old_index: u64, interest_rate: u64): u128 {
+        (old_index as u128) * (100000 + interest_rate as u128) + 5000 / 100000
     }
 
     /// Return index, the result is extended 100 times
