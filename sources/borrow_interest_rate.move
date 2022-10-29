@@ -241,15 +241,15 @@ module lend_config::borrow_interest_rate{
 
     /// Return index, the result is extended 10000 times
     public fun calc_index<C>(old_index: u64, interest_rate: u64): u64 {
-        old_index * (EXTEND_INDEX + interest_rate)
+        old_index * (EXTEND_INDEX + interest_rate) / EXTEND_INDEX
     }
 
     public fun calc_index_u128<C>(old_index: u64, interest_rate: u64): u128 {
-        (old_index as u128) * (EXTEND_INDEX + interest_rate as u128)
+        (old_index as u128) * (EXTEND_INDEX + interest_rate as u128) / (EXTEND_INDEX as u128)
     }
 
     public fun calc_index_u128_u128<C>(old_index: u64, interest_rate: u128): u128 {
-        (old_index as u128) * ((EXTEND_INDEX as u128) + interest_rate )
+        (old_index as u128) * ((EXTEND_INDEX as u128) + interest_rate ) / (EXTEND_INDEX as u128)
     }
 
     /// Return index, the result is extended 100 times
