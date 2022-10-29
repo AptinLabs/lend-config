@@ -13,6 +13,9 @@ module lend_config::borrow_interest_rate{
     const EALREADY_ADDED: u64 = 4;
     const ENOT_FOUND_FORMULA: u64 = 5;
 
+    const SECS_OF_YEAR: u64 = 365 * 24 * 60 * 60;
+    const EXTEND_INDEX: u64 = 100000000;
+
     struct FormulaParam has copy, drop, store {
         ct: TypeInfo,
         k: u64,   // interest rate growth factor, extend 100 times
@@ -207,11 +210,11 @@ module lend_config::borrow_interest_rate{
 
     // result extend 100 times
     public fun calc_borrow_interest_rate_with_diff_time<C>(u: u64, diff_time: u64): u64 acquires Params {
-        calc_borrow_interest_rate<C>(u) * diff_time
+        calc_borrow_interest_rate<C>(u) * diff_time * 10000 / SECS_OF_YEAR
     }
 
     public fun calc_borrow_interest_rate_with_diff_time_u128<C>(u: u64, diff_time: u64): u128 acquires Params {
-        (calc_borrow_interest_rate<C>(u) as u128) * (diff_time as u128)
+        (calc_borrow_interest_rate<C>(u) as u128) * (diff_time as u128) * 10000 / (SECS_OF_YEAR as u128)
     }
 
     // result extend 100000 times, should div 100000  todo: remove generic
@@ -221,11 +224,11 @@ module lend_config::borrow_interest_rate{
 
     // result extend 100000 times, should div 100000
     public fun calc_supply_interest_rate_with_diff_time(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
-        math::mul_div(borrow_interest_rate * diff_time, u, 10000)
+        borrow_interest_rate * diff_time * u / SECS_OF_YEAR
     }
 
     public fun calc_supply_interest_rate_with_diff_time_u128(borrow_interest_rate: u64, u: u64, diff_time: u64): u128 {
-        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (10000 as u128)
+        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (SECS_OF_YEAR as u128)
     }
 
     // result extend 10000 times
@@ -238,15 +241,15 @@ module lend_config::borrow_interest_rate{
 
     /// Return index, the result is extended 10000 times
     public fun calc_index<C>(old_index: u64, interest_rate: u64): u64 {
-        (old_index * (100000 + interest_rate) + 50000) / 100000
+        old_index * (EXTEND_INDEX + interest_rate)
     }
 
     public fun calc_index_u128<C>(old_index: u64, interest_rate: u64): u128 {
-        ((old_index as u128) * (100000 + interest_rate as u128) + 50000) / 100000
+        (old_index as u128) * (EXTEND_INDEX + interest_rate as u128)
     }
 
     public fun calc_index_u128_u128<C>(old_index: u64, interest_rate: u128): u128 {
-        ((old_index as u128) * (100000 + interest_rate) + 50000) / 100000
+        (old_index as u128) * ((EXTEND_INDEX as u128) + interest_rate )
     }
 
     /// Return index, the result is extended 100 times
@@ -283,13 +286,34 @@ module lend_config::borrow_interest_rate{
     fun test_calc_borrow_interest_rate(alice: &signer) acquires Params {
         initialize(alice);
 
-        add<FMK>(alice, 20, 1000, 20, 12930);
+        add<FMK>(alice, 20, 2530, 20, 12930);
 
-        assert!(calc_rate<FMK>(alice, 0) == 1000, 1);
-        assert!(calc_rate<FMK>(alice, 950) == 2900, 1);
+        let u = 950;
+        let diff_time = 306;
+        let r  = calc_rate<FMK>(alice, 950);
+        assert!(r == 4430, 1);
+        let r = calc_supply_interest_rate_with_diff_time_u128(calc_rate<FMK>(alice, 950), u, diff_time);
+        print(&r);
+        assert!(r == 128780, 1);
 
-        let diff_time = 100;
-        assert!(calc_rate<FMK>(alice, 950) * diff_time, 1);
+        let r = calc_index_u128_u128<FMK>(10000, 128780);
+        print(&r);
+        assert!(r == 22878, 1);
+
+        let u = 863;
+        let diff_time = 1645;
+        let r  = calc_rate<FMK>(alice, u);
+        assert!(r == 4256, 1);
+
+        let r = r * diff_time;
+        print(&r);
+        assert!(r == 7001120, 1);
+
+        let r = calc_index_u128_u128<FMK>(10000, 7001120);
+        print(&r);
+        assert!(r == 710112, 1);
+
+
     //     assert!(calc_rate<FMK>(alice, 100) == 2660, 1);
     //     assert!(calc_rate<FMK>(alice, 1000) == 3830, 1);
     //     assert!(calc_rate<FMK>(alice, 2000) == 5130, 1);
@@ -309,7 +333,7 @@ module lend_config::borrow_interest_rate{
     //     assert!(calc_rate<FMK>(alice, 10000) == 188930, 1);
     }
 
-    #[test]
+    #[test_only]
     fun test_calc_index_u128_u128() {
 
         let i = calc_index_u128_u128<FMK>(10000, 139200);
