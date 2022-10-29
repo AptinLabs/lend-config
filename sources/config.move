@@ -78,7 +78,11 @@ module lend_config::config {
     }
 
     public entry fun initialize(account: &signer) {
-        validate_account(account);
+        let account_addr = signer::address_of(account);
+
+        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
+
+        assert!(!exists<Config>(account_addr), error::not_found(EALREADY_PUBLISHED_CONFIG));
 
         move_to(account, Config {
             total_apn_rewards: DEFAULT_REWARD,
