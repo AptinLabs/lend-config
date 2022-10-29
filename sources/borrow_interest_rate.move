@@ -216,16 +216,16 @@ module lend_config::borrow_interest_rate{
 
     // result extend 100000 times, should div 100000  todo: remove generic
     public fun calc_supply_interest_rate<C>(borrow_interest_rate: u64, u: u64): u64 {
-        math::mul_div(borrow_interest_rate, u, 10)
+        math::mul_div(borrow_interest_rate, u, 10000)
     }
 
     // result extend 100000 times, should div 100000
     public fun calc_supply_interest_rate_with_diff_time(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
-        math::mul_div(borrow_interest_rate * diff_time, u, 10)
+        math::mul_div(borrow_interest_rate * diff_time, u, 10000)
     }
 
     public fun calc_supply_interest_rate_with_diff_time_u128(borrow_interest_rate: u64, u: u64, diff_time: u64): u128 {
-        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (10 as u128)
+        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (10000 as u128)
     }
 
     // result extend 10000 times
@@ -275,17 +275,21 @@ module lend_config::borrow_interest_rate{
             // y = a (u - c)^2 + d
             (formula.a * (u - formula.c) * sqrt(((u - formula.c) as u128)) + 10 * formula.d) / 10
         };
+        print(&r);
         r
     }
 
-    // #[test_only(alice=@0x01)]
-    // fun test_calc_borrow_interest_rate(alice: &signer) acquires Params {
-    //     initialize(alice);
-    //
-    //     add<FMK>(alice, 13, 2530, 20, 12930);
-    //
-    //     assert!(calc_rate<FMK>(alice, 0) == 2530, 1);
-    //     assert!(calc_rate<FMK>(alice, 10) == 2543, 1);
+    #[test(alice=@0x01)]
+    fun test_calc_borrow_interest_rate(alice: &signer) acquires Params {
+        initialize(alice);
+
+        add<FMK>(alice, 20, 1000, 20, 12930);
+
+        assert!(calc_rate<FMK>(alice, 0) == 1000, 1);
+        assert!(calc_rate<FMK>(alice, 950) == 2900, 1);
+
+        let diff_time = 100;
+        assert!(calc_rate<FMK>(alice, 950) * diff_time, 1);
     //     assert!(calc_rate<FMK>(alice, 100) == 2660, 1);
     //     assert!(calc_rate<FMK>(alice, 1000) == 3830, 1);
     //     assert!(calc_rate<FMK>(alice, 2000) == 5130, 1);
@@ -303,14 +307,14 @@ module lend_config::borrow_interest_rate{
     //     assert!(calc_rate<FMK>(alice, 9000) == 74930, 1);
     //     assert!(calc_rate<FMK>(alice, 9500) == 126930, 1);
     //     assert!(calc_rate<FMK>(alice, 10000) == 188930, 1);
-    // }
+    }
 
     #[test]
     fun test_calc_index_u128_u128() {
 
-        let i = calc_index_u128_u128<FMK>(10000, 2530);
+        let i = calc_index_u128_u128<FMK>(10000, 139200);
         print(&i);
-        assert!(i == 10253, 1);
+        assert!(i == 23920, 1);
     }
 
     // #[test(bob=@0x02)]
