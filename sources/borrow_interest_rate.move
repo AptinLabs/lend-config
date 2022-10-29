@@ -3,7 +3,7 @@ module lend_config::borrow_interest_rate{
     use std::signer;
     use std::error;
     use lend_config::math;
-    use aptos_std::type_info::{TypeInfo, type_of};
+    use aptos_std::type_info::{type_name};
     use std::vector;
     use lend_config::math::sqrt;
 
@@ -11,13 +11,14 @@ module lend_config::borrow_interest_rate{
     const ENOT_PUBLISHED_FORMULAPARAM: u64 = 2;
     const ENOT_ALLOWED: u64 = 3;
     const EALREADY_ADDED: u64 = 4;
-    const ENOT_FOUND_FORMULA: u64 = 5;
+    const ENOT_FOUND_FORMULA: u64 = 6;
 
     const SECS_OF_YEAR: u64 = 365 * 24 * 60 * 60;
     const EXTEND_INDEX: u64 = 100000000;
+    const DEFAULT_C: u64 = 8000;
 
     struct FormulaParam has copy, drop, store {
-        ct: TypeInfo,
+        ct: String,
         k: u64,   // interest rate growth factor, extend 100 times
         b: u64,  // base rate, extend 1000 times
 
@@ -35,7 +36,7 @@ module lend_config::borrow_interest_rate{
 
     public entry fun initialize(account: &signer, ) {
         let account_addr = signer::address_of(account);
-        // assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
+        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
         assert!(!exists<Params>(account_addr), EALREADY_PUBLISHED_FORMULAPARAM);
 
         move_to(account, Params {
@@ -43,7 +44,7 @@ module lend_config::borrow_interest_rate{
         })
     }
 
-    fun contains(params: &vector<FormulaParam>, ct: &TypeInfo): (bool, u64) {
+    fun contains(params: &vector<FormulaParam>, ct: &String): (bool, u64) {
         let len = vector::length(params);
         let i = 0;
         while (i < len) {
@@ -56,26 +57,33 @@ module lend_config::borrow_interest_rate{
         (false, 0)
     }
 
-    public entry fun add<C>(account: &signer, k: u64, b: u64, a: u64, d: u64) acquires Params {
+    fun validate_account(account: &signer) {
         let account_addr = signer::address_of(account);
-        // assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
 
-        let params = borrow_global_mut<Params>(account_addr);
+        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
 
-        let type_info = type_of<C>();
+        assert!(exists<Params>(account_addr), error::not_found(ENOT_PUBLISHED_FORMULAPARAM));
+    }
 
-        let (e, _i) = contains(&params.vals, &type_info);
+    public entry fun add<C>(account: &signer, k: u64, b: u64, a: u64, d: u64) acquires Params {
+        validate_account(account);
+
+        let params = borrow_global_mut<Params>(@lend_config);
+
+        let ty_name = type_name<C>();
+
+        let (e, _i) = contains(&params.vals, &ty_name);
 
         if (e) {
             abort EALREADY_ADDED
         } else {
             vector::push_back(&mut params.vals, FormulaParam {
-                ct: type_info,
+                ct: ty_name,
                 k,
                 b,
 
                 a,
-                c: 8000,
+                c: DEFAULT_C,
                 d,
                 reserves: 0
             })
@@ -84,14 +92,13 @@ module lend_config::borrow_interest_rate{
     }
 
     public entry fun set_k<C>(account: &signer, k: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
+        validate_account(account);
 
-        let params = borrow_global_mut<Params>(account_addr);
+        let params = borrow_global_mut<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow_mut(&mut params.vals, i);
             formula.k = k
@@ -100,16 +107,14 @@ module lend_config::borrow_interest_rate{
         }
     }
 
-
     public entry fun set_b<C>(account: &signer, b: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
+        validate_account(account);
 
-        let params = borrow_global_mut<Params>(account_addr);
+        let params = borrow_global_mut<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow_mut(&mut params.vals, i);
             formula.b = b
@@ -119,14 +124,13 @@ module lend_config::borrow_interest_rate{
     }
 
     public entry fun set_a<C>(account: &signer, a: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
+        validate_account(account);
 
-        let params = borrow_global_mut<Params>(account_addr);
+        let params = borrow_global_mut<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow_mut(&mut params.vals, i);
             formula.a = a
@@ -135,32 +139,14 @@ module lend_config::borrow_interest_rate{
         }
     }
 
-    public entry fun set_c<C>(account: &signer, c: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
-
-        let params = borrow_global_mut<Params>(account_addr);
-
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
-        if (e) {
-            let formula = vector::borrow_mut(&mut params.vals, i);
-            formula.c = c
-        } else {
-            abort ENOT_FOUND_FORMULA
-        }
-    }
-
     public entry fun set_d<C>(account: &signer, d: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
+        validate_account(account);
 
-        let params = borrow_global_mut<Params>(account_addr);
+        let params = borrow_global_mut<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow_mut(&mut params.vals, i);
             formula.d = d
@@ -170,14 +156,12 @@ module lend_config::borrow_interest_rate{
     }
 
     public entry fun set_reserves<C>(account: &signer, reserves: u64) acquires Params {
-        let account_addr = signer::address_of(account);
-        assert!(account_addr == @lend_config, error::permission_denied(ENOT_ALLOWED));
-        assert!(exists<Params>(account_addr), ENOT_PUBLISHED_FORMULAPARAM);
+        validate_account(account);
 
-        let params = borrow_global_mut<Params>(account_addr);
+        let params = borrow_global_mut<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow_mut(&mut params.vals, i);
             formula.reserves = reserves
@@ -191,8 +175,9 @@ module lend_config::borrow_interest_rate{
 
         let params = borrow_global<Params>(@lend_config);
 
-        let type_info = type_of<C>();
-        let (e, i) = contains(&params.vals, &type_info);
+        let ty_name = type_name<C>();
+
+        let (e, i) = contains(&params.vals, &ty_name);
         if (e) {
             let formula = vector::borrow(&params.vals, i);
             // u extend 1000 times
@@ -208,27 +193,12 @@ module lend_config::borrow_interest_rate{
         }
     }
 
-    // result extend 100 times
     public fun calc_borrow_interest_rate_with_diff_time<C>(u: u64, diff_time: u64): u64 acquires Params {
-        calc_borrow_interest_rate<C>(u) * diff_time * 10000 / SECS_OF_YEAR
+        ((calc_borrow_interest_rate<C>(u) as u128) * (diff_time as u128) * 10000 / (SECS_OF_YEAR as u128) as u64)
     }
 
-    public fun calc_borrow_interest_rate_with_diff_time_u128<C>(u: u64, diff_time: u64): u128 acquires Params {
-        (calc_borrow_interest_rate<C>(u) as u128) * (diff_time as u128) * 10000 / (SECS_OF_YEAR as u128)
-    }
-
-    // result extend 100000 times, should div 100000  todo: remove generic
-    public fun calc_supply_interest_rate<C>(borrow_interest_rate: u64, u: u64): u64 {
-        math::mul_div(borrow_interest_rate, u, 10000)
-    }
-
-    // result extend 100000 times, should div 100000
-    public fun calc_supply_interest_rate_with_diff_time(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
-        borrow_interest_rate * diff_time * u / SECS_OF_YEAR
-    }
-
-    public fun calc_supply_interest_rate_with_diff_time_u128(borrow_interest_rate: u64, u: u64, diff_time: u64): u128 {
-        (borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (SECS_OF_YEAR as u128)
+    public fun calc_supply_interest_rate(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
+        ((borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) * 10000 / (SECS_OF_YEAR as u128) as u64)
     }
 
     // result extend 10000 times
@@ -239,22 +209,8 @@ module lend_config::borrow_interest_rate{
         math::mul_div_u128(borrow, 10000, supply)
     }
 
-    /// Return index, the result is extended 10000 times
-    public fun calc_index<C>(old_index: u64, interest_rate: u64): u64 {
-        old_index * (EXTEND_INDEX + interest_rate) / EXTEND_INDEX
-    }
-
-    public fun calc_index_u128<C>(old_index: u64, interest_rate: u64): u128 {
-        (old_index as u128) * (EXTEND_INDEX + interest_rate as u128) / (EXTEND_INDEX as u128)
-    }
-
-    public fun calc_index_u128_u128<C>(old_index: u64, interest_rate: u128): u128 {
-        (old_index as u128) * ((EXTEND_INDEX as u128) + interest_rate ) / (EXTEND_INDEX as u128)
-    }
-
-    /// Return index, the result is extended 100 times
-    public fun calc_index2(old_index: u64, interest_rate: u64): u64 {
-        old_index * (100 + interest_rate) / 100
+    public fun calc_index_u128(old_index: u64, interest_rate: u64): u64 {
+        ((old_index as u128) * (EXTEND_INDEX  + interest_rate as u128) / (EXTEND_INDEX as u128) as u64)
     }
 
     #[test_only]
@@ -262,7 +218,7 @@ module lend_config::borrow_interest_rate{
 
     #[test_only]
     use aptos_std::debug::print;
-
+    use std::string::String;
 
 
     #[test_only(alice=@0x01)]
@@ -288,32 +244,6 @@ module lend_config::borrow_interest_rate{
 
         add<FMK>(alice, 20, 2530, 20, 12930);
 
-        let u = 950;
-        let diff_time = 306;
-        let r  = calc_rate<FMK>(alice, 950);
-        assert!(r == 4430, 1);
-        let r = calc_supply_interest_rate_with_diff_time_u128(calc_rate<FMK>(alice, 950), u, diff_time);
-        print(&r);
-        assert!(r == 128780, 1);
-
-        let r = calc_index_u128_u128<FMK>(10000, 128780);
-        print(&r);
-        assert!(r == 22878, 1);
-
-        let u = 863;
-        let diff_time = 1645;
-        let r  = calc_rate<FMK>(alice, u);
-        assert!(r == 4256, 1);
-
-        let r = r * diff_time;
-        print(&r);
-        assert!(r == 7001120, 1);
-
-        let r = calc_index_u128_u128<FMK>(10000, 7001120);
-        print(&r);
-        assert!(r == 710112, 1);
-
-
     //     assert!(calc_rate<FMK>(alice, 100) == 2660, 1);
     //     assert!(calc_rate<FMK>(alice, 1000) == 3830, 1);
     //     assert!(calc_rate<FMK>(alice, 2000) == 5130, 1);
@@ -333,13 +263,6 @@ module lend_config::borrow_interest_rate{
     //     assert!(calc_rate<FMK>(alice, 10000) == 188930, 1);
     }
 
-    #[test_only]
-    fun test_calc_index_u128_u128() {
-
-        let i = calc_index_u128_u128<FMK>(10000, 139200);
-        print(&i);
-        assert!(i == 23920, 1);
-    }
 
     // #[test(bob=@0x02)]
     // fun test_calc_supply_interest_rate(bob: &signer) acquires Params {

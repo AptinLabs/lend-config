@@ -8,4 +8,4 @@ rev = 'a2a3bf79b68823287f962bded2abfaefc688e71c'
 subdir = 'aptos-move/framework/aptos-framework'
 
 [addresses]
-lend_config='0xe0e07cb03df0d97f61a0ea236830f3bd6e1bfa3cf0bfdf592f11a7762d3d7909'
+lend_config='0xffffb916d592f01cf27be4c99a8a6c1fc82c4400a5f0514fcf1568e35f53e167'
