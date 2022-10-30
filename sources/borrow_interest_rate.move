@@ -198,7 +198,7 @@ module lend_config::borrow_interest_rate{
     }
 
     public fun calc_supply_interest_rate(borrow_interest_rate: u64, u: u64, diff_time: u64): u64 {
-        ((borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) * 10000 / (SECS_OF_YEAR as u128) as u64)
+        ((borrow_interest_rate as u128) * (diff_time as u128) * (u as u128) / (SECS_OF_YEAR as u128) as u64)
     }
 
     // result extend 10000 times

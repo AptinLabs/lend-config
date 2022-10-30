@@ -234,7 +234,7 @@ module lend_config::config {
     public fun apn_reward_stake_per_secs<C>(): u64 acquires Config {
         let r = apn_reward_stake<C>();
 
-        100 * r / APN_DURATION
+        r / APN_DURATION
     }
 
     fun borrow(ct: &String): Store acquires Config {
