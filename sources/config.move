@@ -9,12 +9,14 @@ module lend_config::config {
     const EALREADY_PUBLISHED_CONFIG: u64 = 1;
     const ENOT_FOUND_CONFIG: u64 = 2;
     const ETOTAL_WEIGHT_NOT_EQUALS_100: u64 = 3;
-    const EWEIGHT_MORE_THAN_100: u64 = 4;
+    const EWEIGHT_EQUALS_ZERO: u64 = 4;
     const ENOT_FOUND_COIN_TYPE: u64 = 5;
-    const ELTV_MORE_THAN_100: u64 = 6;
+    const ELTV_MORE_THAN_100_OR_EQUALS_ZERO: u64 = 6;
     const EFEES_MORE_THAN_100: u64 = 7;
     const EALREADY_ADDED: u64 = 8;
     const ENOT_ALLOWED: u64 = 9;
+    const UNKNOW_OPER_TYPE: u64 = 10;
+    const ELTV_OR_WEIGHT_EQUALS_ZERO: u64 = 11;
 
     const ENOT_EXISTS_APN_REWARD: u64 = 2001;
     const ENOT_EXISTS_FEES: u64 = 2002;
@@ -92,8 +94,11 @@ module lend_config::config {
     }
 
     public entry fun add<C>(account: &signer, ltv: u8, fees: u8, weight: u8, deposit_limit: u64) acquires Config {
-        assert!(ltv < 100, error::invalid_argument(ELTV_MORE_THAN_100));
         assert!(fees < 100, error::invalid_argument(EFEES_MORE_THAN_100));
+
+        assert!(ltv < 100 && ltv != 0, ELTV_MORE_THAN_100_OR_EQUALS_ZERO);
+
+        assert!(weight != 0, EWEIGHT_EQUALS_ZERO);
 
         validate_account(account);
 
@@ -106,7 +111,10 @@ module lend_config::config {
             abort EALREADY_ADDED
         };
 
-        vector::push_back(&mut config.stores, Store { ct: type_name, ltv, fees, weight, deposit_limit });
+        vector::push_back(&mut config.stores, Store { ct: type_name, ltv, fees, weight, deposit_limit});
+
+        //todo: call update apn
+
     }
 
     public entry fun remove<C>(account: &signer) acquires Config {
@@ -146,7 +154,7 @@ module lend_config::config {
     }
 
     public entry fun set_ltv<C>(account: &signer, new_ltv: u8) acquires Config {
-        assert!(new_ltv < 100, error::invalid_argument(ELTV_MORE_THAN_100));
+        assert!(new_ltv < 100 && new_ltv != 0, error::invalid_argument(ELTV_MORE_THAN_100_OR_EQUALS_ZERO));
 
         let type_name = type_name<C>();
 
@@ -210,6 +218,24 @@ module lend_config::config {
         let type_name = type_name<C>();
 
         let (e, i) = contains(&config.stores, &type_name);
+
+        if (e) {
+            let sum_quota = sum(&config.stores);
+            let store = vector::borrow(&config.stores, i);
+            let r = (config.total_apn_rewards as u128) * (store.weight as u128) / (APN_DURATION * sum_quota * 2 as u128);
+            (r as u64)
+        } else {
+            abort ENOT_EXISTS_APN_REWARD
+        }
+    }
+
+    /// Return APN reward for each coin
+    public fun apn_reward_with_name(type_name: &String): u64 acquires Config {
+        assert!(exists<Config>(@lend_config), error::not_found(ENOT_FOUND_CONFIG));
+
+        let config = borrow_global<Config>(@lend_config);
+
+        let (e, i) = contains(&config.stores, type_name);
 
         if (e) {
             let sum_quota = sum(&config.stores);
